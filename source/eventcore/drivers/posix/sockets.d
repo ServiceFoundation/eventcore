@@ -198,7 +198,9 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 	{
 		auto sock = cast(StreamSocketFD)fd;
 		auto l = lockHandle(sock);
+		addRef(sock); // add back the reference released on connectStream
 		m_loop.setNotifyCallback!(EventType.write)(sock, null);
+		m_loop.setNotifyCallback!(EventType.status)(sock, null);
 		with (m_loop.m_fds[sock].streamSocket) {
 			state = ConnectionState.connected;
 			auto cb = connectCallback;
@@ -207,13 +209,18 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 		}
 	}
 
-	private void onConnectError(FD sock)
+	private void onConnectError(FD fd)
 	{
-		// FIXME: determine the correct kind of error!
+		auto sock = cast(StreamSocketFD)fd;
+		auto l = lockHandle(sock);
+		addRef(sock); // add back the reference released on connectStream
+		m_loop.setNotifyCallback!(EventType.write)(sock, null);
+		m_loop.setNotifyCallback!(EventType.status)(sock, null);
 		with (m_loop.m_fds[sock].streamSocket) {
 			state = ConnectionState.closed;
 			auto cb = connectCallback;
 			connectCallback = null;
+			// FIXME: determine the correct kind of error!
 			if (cb) cb(cast(StreamSocketFD)sock, ConnectStatus.refused);
 		}
 	}
